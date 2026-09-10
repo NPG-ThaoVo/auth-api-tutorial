@@ -7,7 +7,7 @@
 ###
 ###  Thứ tự test gợi ý: 1 Register -> 3 Login -> 5 /me -> 8 change-password
 ###                     -> 9 logout -> 11 admin dashboard (403)
-###                     -> seed admin -> 12 login admin -> 13 dashboard (200)
+###                     -> nang role admin -> 12 login admin -> 13 dashboard (200)
 ### ==========================================================================
 
 @baseUrl = http://localhost:3000
@@ -245,7 +245,7 @@ GET {{authUrl}}/admin/dashboard
 
 ###
 
-# 11. Test admin: chạy `npm run seed:admin` hoặc update role trong MongoDB:
+# 11. Test admin: nang role user thanh admin truc tiep trong MongoDB:
 #     db.users.updateOne({ email: "user@example.com" }, { $set: { role: "admin" } })
 #     rồi LOGIN LẠI để lấy token mới (role nằm trong payload JWT cũ).
 

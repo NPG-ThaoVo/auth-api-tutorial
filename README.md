@@ -2,8 +2,29 @@
 
 # **Auth API — Topic Guide cho Intern**
  
-> Bỏ qua phần setup project, cài package, tạo `.env` và error middleware. Các phần đó đã có sẵn trong project.
+> Repo này đã có sẵn phần setup (`package.json`, `.env.example`, kết nối MongoDB, error middleware) và code mẫu cho cả 8 topic. Chỉ cần `npm install`, tạo `.env` rồi `npm run dev`.
 > 
+
+## **Chạy project này**
+
+```bash
+npm install
+copy .env.example .env    # trên macOS/Linux dùng: cp .env.example .env
+# chỉnh MONGO_URI và JWT_SECRET trong .env
+npm run dev
+```
+
+Lưu ý về cấu trúc: project này **không tách `src/app.js`** như tài liệu gốc.
+Toàn bộ việc khởi tạo Express, kết nối MongoDB, mount route /api/auth,
+404 handler và error middleware đều nằm trong `src/server.js`.
+
+Test nhanh bằng extension **REST Client** của VS Code:
+
+```text
+tests/auth-api.http
+```
+
+---
 
 ## **Quy ước chung**
 
@@ -27,8 +48,8 @@ src/
 │   └── user.model.js
 ├── routes/
 │   └── auth.routes.js
-├── app.js                    # Mount auth routes
-└── server.js                 # Đã có từ project CRUD
+└── server.js                 # Express app, MongoDB, mount routes,
+                                          # error handler, listen port
 ```
 
 ## **Tổng quan dependency giữa các topic**
@@ -570,7 +591,7 @@ router.get("/me", authMiddleware, getMe);
 module.exports = router;
 ```
 
-Mount trong `src/app.js`:
+Mount trong `src/server.js`:
 
 ```jsx
 const authRoutes = require("./routes/auth.routes");
@@ -979,7 +1000,7 @@ module.exports = router;
 
 ## **Bước 3: Kiểm tra mount route**
 
-Trong `src/app.js`:
+Trong `src/server.js`:
 
 ```jsx
 const authRoutes = require("./routes/auth.routes");

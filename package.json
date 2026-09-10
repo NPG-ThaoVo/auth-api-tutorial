@@ -5,9 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "seed:admin": "node scripts/seed-admin.js",
-    "check": "node scripts/check-modules.js"
+    "dev": "nodemon src/server.js"
   },
   "keywords": [
     "express",
