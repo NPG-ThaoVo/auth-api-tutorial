@@ -1,0 +1,287 @@
+### ==========================================================================
+###  AUTH API — REST Client (VS Code extension: "REST Client")
+###  Cách dùng:
+###    1. Chạy server:  npm run dev
+###    2. Mở file này, bấm "Send Request" phía trên mỗi request.
+###    3. Copy `token` từ response Login → dán vào các biến @token bên dưới.
+###
+###  Thứ tự test gợi ý: 1 Register -> 3 Login -> 5 /me -> 8 change-password
+###                     -> 9 logout -> 11 admin dashboard (403)
+###                     -> seed admin -> 12 login admin -> 13 dashboard (200)
+### ==========================================================================
+
+@baseUrl = http://localhost:3000
+@authUrl = {{baseUrl}}/api/auth
+@contentType = application/json
+
+# Token lấy từ response của request "3. Login" ở phần Register bên dưới.
+@token = DÁN_TOKEN_VÀO_ĐÂY
+
+# Token của admin (lấy từ request "12. Login admin").
+@adminToken = DÁN_TOKEN_ADMIN_VÀO_ĐÂY
+
+
+### -------------------------------------------------------------------------
+### Topic 2 — REGISTER (public)
+### -------------------------------------------------------------------------
+
+# 1. Register hợp lệ -> mong đợi 201, response không có password
+POST {{authUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Nguyen Van A",
+  "email": "user@example.com",
+  "password": "123456"
+}
+
+###
+
+# 2. Thiếu field -> mong đợi 400
+POST {{authUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Thieu Password",
+  "email": "thieu@example.com"
+}
+
+###
+
+# 2b. Password dưới 6 ký tự -> mong đợi 400
+POST {{authUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Ngan Qua",
+  "email": "ngan@example.com",
+  "password": "123"
+}
+
+###
+
+# 2c. Email trùng với request 1 -> mong đợi 409
+POST {{authUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Nguyen Van A",
+  "email": "user@example.com",
+  "password": "123456"
+}
+
+###
+
+# 2d. Không cho client tự khai role admin -> role vẫn là "user"
+POST {{authUrl}}/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Fake Admin",
+  "email": "fakeadmin@example.com",
+  "password": "123456",
+  "role": "admin"
+}
+
+
+### -------------------------------------------------------------------------
+### Topic 3 — LOGIN & JWT (public)
+### -------------------------------------------------------------------------
+
+# 3. Login đúng -> mong đợi 200 + token (copy token gán vào @token)
+# @name login
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user@example.com",
+  "password": "123456"
+}
+
+###
+
+# 4. Sai password -> mong đợi 401
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user@example.com",
+  "password": "sai-mat-khau"
+}
+
+###
+
+# 4b. Email không tồn tại -> mong đợi 401
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "khong-ton-tai@example.com",
+  "password": "123456"
+}
+
+###
+
+# 4c. Thiếu field -> mong đợi 400
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "user@example.com"
+}
+
+
+### -------------------------------------------------------------------------
+### Topic 4 — PROTECTED ROUTE /me
+### -------------------------------------------------------------------------
+
+# 5. Có token hợp lệ -> mong đợi 200, không có password
+GET {{authUrl}}/me
+Authorization: Bearer {{token}}
+
+###
+
+# 5b. Không gửi Authorization -> mong đợi 401
+GET {{authUrl}}/me
+
+###
+
+# 5c. Thiếu chữ "Bearer" -> mong đợi 401
+GET {{authUrl}}/me
+Authorization: {{token}}
+
+###
+
+# 5d. Token giả -> mong đợi 401
+GET {{authUrl}}/me
+Authorization: Bearer day_khong_phai_token_that
+
+###
+
+# 5e. Token đúng nhưng user đã bị xoá khỏi DB -> mong đợi 404
+# Gợi ý: login rồi xoá document user trong MongoDB, sau đó gọi lại.
+GET {{authUrl}}/me
+Authorization: Bearer {{token}}
+
+
+### -------------------------------------------------------------------------
+### Topic 5A — CHANGE PASSWORD (protected)
+### -------------------------------------------------------------------------
+
+# 6. Sai password cũ -> mong đợi 401
+PUT {{authUrl}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "oldPassword": "password-cu-sai",
+  "newPassword": "new123456"
+}
+
+###
+
+# 6b. Password mới dưới 6 ký tự -> mong đợi 400
+PUT {{authUrl}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "oldPassword": "123456",
+  "newPassword": "123"
+}
+
+###
+
+# 6c. Thiếu field -> mong đợi 400
+PUT {{authUrl}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "oldPassword": "123456"
+}
+
+###
+
+# 7. Đổi đúng -> mong đợi 200.
+# Sau đó: login bằng password CŨ phải 401, login password MỚI phải 200.
+PUT {{authUrl}}/change-password
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "oldPassword": "123456",
+  "newPassword": "new123456"
+}
+
+
+### -------------------------------------------------------------------------
+### Topic 5B — LOGOUT (public endpoint, client tự xoá token)
+### -------------------------------------------------------------------------
+
+# 8. Logout -> mong đợi 200. Token cũ VẪN còn dùng được tới khi hết hạn
+#    (JWT stateless). Đây là điểm cần hiểu ở topic này.
+POST {{authUrl}}/logout
+
+###
+
+# 8b. Chứng minh token cũ chưa bị revoke: gọi lại /me vẫn 200
+GET {{authUrl}}/me
+Authorization: Bearer {{token}}
+
+
+### -------------------------------------------------------------------------
+### Topic 6 — RBAC
+### -------------------------------------------------------------------------
+
+# 9. User thường vào khu vực admin -> mong đợi 403
+GET {{authUrl}}/admin/dashboard
+Authorization: Bearer {{token}}
+
+###
+
+# 10. Không có token -> mong đợi 401 (chưa xác thực, chưa kịp kiểm tra quyền)
+GET {{authUrl}}/admin/dashboard
+
+###
+
+# 11. Test admin: chạy `npm run seed:admin` hoặc update role trong MongoDB:
+#     db.users.updateOne({ email: "user@example.com" }, { $set: { role: "admin" } })
+#     rồi LOGIN LẠI để lấy token mới (role nằm trong payload JWT cũ).
+
+# 11b. Login bằng tài khoản admin -> mong đợi 200, role = "admin"
+# @name loginAdmin
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@example.com",
+  "password": "Admin@123456"
+}
+
+###
+
+# 12. Admin vào dashboard -> mong đợi 200
+GET {{authUrl}}/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+
+### -------------------------------------------------------------------------
+### Tiện ích
+### -------------------------------------------------------------------------
+
+# 13. Health check -> mong đợi 200
+GET {{baseUrl}}/health
+
+###
+
+# 14. Route không tồn tại -> mong đợi 404 đúng error contract
+GET {{baseUrl}}/api/khong-co-route-nay
+
+###
+
+# 15. Body JSON hỏng -> mong đợi 400
+POST {{authUrl}}/login
+Content-Type: {{contentType}}
+
+{ "email": "user@example.com",
