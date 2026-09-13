@@ -4,6 +4,7 @@ const authorizeRoles = require("../middleware/role.middleware");
 const {
   register,
   login,
+  googleLogin,
   getMe,
   changePassword,
   logout
@@ -14,6 +15,7 @@ const router = express.Router();
 // Public routes
 router.post("/register", register);
 router.post("/login", login);
+router.post("/google-login", googleLogin);
 router.post("/logout", logout);
 
 // Protected routes

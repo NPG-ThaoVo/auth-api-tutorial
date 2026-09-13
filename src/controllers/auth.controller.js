@@ -5,6 +5,7 @@
  */
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const firebaseAdmin = require("../config/firebase");
 const User = require("../models/user.model");
 
 /**
@@ -98,6 +99,14 @@ const login = async (req, res, next) => {
       });
     }
 
+    if (!user.password) {
+      return res.status(401).json({
+        message: "Tài khoản này cần đăng nhập bằng Google",
+        error: "Unauthorized",
+        statusCode: 401
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
@@ -121,6 +130,98 @@ const login = async (req, res, next) => {
 
     return res.status(200).json({
       message: "Đăng nhập thành công",
+      user: removePassword(user),
+      token,
+      expiresIn
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/auth/google-login
+ * Xác thực Firebase ID Token, sau đó tìm hoặc tạo user và cấp JWT của hệ thống.
+ */
+const googleLogin = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        message: "idToken là bắt buộc",
+        error: "BadRequest",
+        statusCode: 400
+      });
+    }
+
+    if (!firebaseAdmin) {
+      return res.status(503).json({
+        message: "Firebase Admin chưa được cấu hình",
+        error: "ServiceUnavailable",
+        statusCode: 503
+      });
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      return res.status(401).json({
+        message:
+          error.code === "auth/id-token-expired"
+            ? "Firebase ID Token đã hết hạn"
+            : "Firebase ID Token không hợp lệ",
+        error: "Unauthorized",
+        statusCode: 401
+      });
+    }
+
+    const { uid, email, name, picture } = decodedToken;
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Tài khoản Google không cung cấp email hợp lệ",
+        error: "BadRequest",
+        statusCode: 400
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (user) {
+      let updated = false;
+      if (!user.googleId) {
+        user.googleId = uid;
+        updated = true;
+      }
+      if (picture && user.avatar === "default.jpg") {
+        user.avatar = picture;
+        updated = true;
+      }
+      if (updated) {
+        await user.save();
+      }
+    } else {
+      user = await User.create({
+        name: name || normalizedEmail.split("@")[0],
+        email: normalizedEmail,
+        googleId: uid,
+        avatar: picture || "default.jpg",
+        authType: "google"
+      });
+    }
+
+    const expiresIn = process.env.JWT_EXPIRES_IN || "1d";
+    const token = jwt.sign(
+      { userId: user._id.toString(), role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn }
+    );
+
+    return res.status(200).json({
+      message: "Đăng nhập Google thành công",
       user: removePassword(user),
       token,
       expiresIn
@@ -225,6 +326,7 @@ const logout = async (req, res) => {
 module.exports = {
   register,
   login,
+  googleLogin,
   getMe,
   changePassword,
   logout
